@@ -4,8 +4,7 @@ import time
 
 import metrics
 
-
-def train_model(model_name, model, criterion, optimizer, train_loader, valid_loader, device, n_epochs, train_stop_criteria, train_stop_patience, save_state_dic, perf_prev=None):
+def train_model(project_path, model_name, model, criterion, optimizer, lr_scheduler, train_loader, valid_loader, device, n_epochs, train_stop_criteria, train_stop_patience, save_state_dic, perf_prev=None):
 
     model.to(device)
     train_perf = perf_prev if perf_prev else init_train_perf()
@@ -21,14 +20,16 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
         model.train()  # prep model for training
         train_loss = 0
         train_len = 0
+        train_ref_vals = []
+        train_est_vals = []
         for data, target in train_loader:
             data, target = data.to(device), target.to(device)
-            # clear the gradients of all optimized variables
-            optimizer.zero_grad()
             # forward pass: compute predicted outputs by passing inputs to the model
             output = model(data)
             # calculate the loss
             loss = criterion(output, target)
+            # clear the gradients of all optimized variables
+            optimizer.zero_grad()
             # backward pass: compute gradient of the loss with respect to model parameters
             loss.backward()
             # perform a single optimization step (parameter update)
@@ -36,11 +37,15 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
             # update running training loss
             train_loss += loss.item() * data.size(0)
             train_len += data.shape[0]
+
+            train_ref_vals.extend(target.cpu().numpy().reshape(-1))
+            top_class = torch.argmax(output, dim=1)
+            train_est_vals.extend(top_class.cpu().numpy().reshape(-1))
         ######################
         # validate the model #
         ######################
-        ref_vals = []
-        est_vals = []
+        valid_ref_vals = []
+        valid_est_vals = []
         valid_loss = 0
         model.eval()  # prep model for evaluation
         valid_len = 0
@@ -54,22 +59,27 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
                 # update running validation loss
                 valid_loss += loss.item() * data.size(0)
                 valid_len += data.shape[0]
-                ps = torch.exp(output)
-                top_prob, top_class = ps.topk(1, dim=1)
-                ref_vals.extend(target.cpu().numpy().reshape(-1))
-                est_vals.extend(top_class.cpu().numpy().reshape(-1))
+
+                #ps = torch.exp(output)
+                #top_prob, top_class = ps.topk(1, dim=1)
+                top_class = torch.argmax(output, dim=1)
+                valid_ref_vals.extend(target.cpu().numpy().reshape(-1))
+                valid_est_vals.extend(top_class.cpu().numpy().reshape(-1))
+
 
         # calculate metrics over an epoch
         train_loss /= train_len
         valid_loss /= valid_len
-        accuracy = metrics.accuracy(ref_vals, est_vals)
+        train_accuracy = metrics.accuracy(train_ref_vals, train_est_vals)
+        valid_accuracy = metrics.accuracy(valid_ref_vals, valid_est_vals)
         #precision = metrics.precision(ref_vals, est_vals)
         #recall = metrics.recall(ref_vals, est_vals)
         #F1score = metrics.F1score(ref_vals, est_vals)
 
         train_perf['train_loss'].extend([train_loss])
         train_perf['valid_loss'].extend([valid_loss])
-        train_perf['accuracy'].extend([accuracy])
+        train_perf['train_accuracy'].extend([train_accuracy])
+        train_perf['valid_accuracy'].extend([valid_accuracy])
         #train_perf['precision'].extend([precision])
         #train_perf['recall'].extend([recall])
         #train_perf['F1score'].extend([F1score])
@@ -80,8 +90,8 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
         #print('Epoch: {} \tTraining Loss: {:.3f} \tValidation Loss: {:.3f} \tPrecision: {:.3f}% \tRecall: {:.3f}% \tF1-score: {:.3f}'.format(
         #    epoch + 1, train_loss, valid_loss, precision*100, recall*100, F1score) )
         print(
-            'Epoch: {} \tTraining Loss: {:.3f} \tValidation Loss: {:.3f} \tAccuracy: {:.3f}'.format(
-                epoch + 1, train_loss, valid_loss, accuracy * 100))
+            'Epoch: {} \tTraining Loss: {:.3f} \tTrain Accuracy: {:.3f} \tValidation Loss: {:.3f} \tValid Accuracy: {:.3f}'.format(
+                epoch + 1, train_loss, train_accuracy * 100, valid_loss, valid_accuracy * 100))
 
         # stop criteria
         criteria_val = update_criteria_val(train_stop_criteria, train_perf)
@@ -94,8 +104,7 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
                 print(criteria_str + ' improved ({:.3f} --> {:.3f}).  Saving model ...'.format(criteria_best, criteria_val))
                 if torch.cuda.is_available():
                     model.cpu()
-                torch.save(model.state_dict(), 'models/' + model_name + '/state_dict.pth')
-                np.save('models/' + model_name + '/train_perf.npy', train_perf)
+                torch.save(model.state_dict(), project_path + 'models/' + model_name + '/state_dict.pth')
                 criteria_best = criteria_val
                 criteria_counter = 0
                 if torch.cuda.is_available():
@@ -104,10 +113,15 @@ def train_model(model_name, model, criterion, optimizer, train_loader, valid_loa
         else:
             criteria_counter += 1
 
+        np.save(project_path + 'models/' + model_name + '/train_perf.npy', train_perf)
         if epoch > train_stop_patience and criteria_counter >= train_stop_patience:
             print('Ending Training loop due to non imporving criteria\n')
-            model.load_state_dict(torch.load('models/' + model_name + '/state_dict.pth')) # return best model
+            model.load_state_dict(torch.load(project_path + 'models/' + model_name + '/state_dict.pth')) # return best model
             break
+
+        if lr_scheduler != []:
+            lr_scheduler.step()
+            print('LR: ' + str(lr_scheduler.get_last_lr()))
 
     if torch.cuda.is_available():
         model.cpu()
@@ -120,7 +134,9 @@ def init_train_perf():
     train_perf = {}
     train_perf['train_loss'] = []
     train_perf['valid_loss'] = []
-    train_perf['accuracy'] = []
+    train_perf['train_accuracy'] = []
+    train_perf['valid_accuracy'] = []
+    train_perf['test_accuracy'] = []
     train_perf['precision'] = []
     train_perf['recall'] = []
     train_perf['F1score'] = []

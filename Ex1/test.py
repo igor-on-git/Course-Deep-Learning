@@ -1,7 +1,6 @@
 import torch
 import metrics
 
-
 def test(model_name, model, criterion, test_loader, device):
 
     # initialize lists to monitor test loss and accuracy
@@ -31,11 +30,11 @@ def test(model_name, model, criterion, test_loader, device):
 
         # calculate and print avg test loss
         test_perf['test_loss'] /= test_len
-        test_perf['accuracy'] = metrics.accuracy(ref_vals, est_vals)
+        test_perf['test_accuracy'] = metrics.accuracy(ref_vals, est_vals)
         #test_perf['precision'] = metrics.precision(ref_vals, est_vals)
         #test_perf['recall'] = metrics.recall(ref_vals, est_vals)
         #test_perf['F1score'] = metrics.F1score(ref_vals, est_vals)
-        print('Model: {}\tTest Loss: {:.3f}\tAccuracy: {:.3f}%'.format(model_name, test_perf['test_loss'], test_perf['accuracy']*100))
+        print('Model: {}\tTest Loss: {:.3f}\tAccuracy: {:.3f}%'.format(model_name, test_perf['test_loss'], test_perf['test_accuracy']*100))
 
     return test_perf
 
@@ -44,7 +43,11 @@ def init_test_perf():
 
     test_perf = {}
     test_perf['test_loss'] = 0
-    test_perf['accuaracy'] = 0
+    test_perf['valid_loss'] = 0
+    test_perf['train_loss'] = 0
+    test_perf['train_accuaracy'] = 0
+    test_perf['valid_accuaracy'] = 0
+    test_perf['test_accuaracy'] = 0
     test_perf['precision'] = 0
     test_perf['recall'] = 0
     test_perf['F1score'] = 0

@@ -38,24 +38,67 @@ def reorder_data_for_image_folder(source, dest):
                 shutil.copy2(fname, dest + '/0/')
 
 
-def plot_train_results(model_name, train_perf):
+def plot_train_results(model_name, train_perf, project_path):
 
     plt.figure(1)
     plt.plot(range(len(train_perf['train_loss'])), train_perf['train_loss'], label='Train Loss')
-    plt.plot(range(len(train_perf['valid_loss'])), train_perf['valid_loss'], label='Validation Loss')
-    plt.title(model_name + ' Train and Validation loss')
+    plt.plot(range(len(train_perf['valid_loss'])), train_perf['valid_loss'], label='Valid Loss')
+    plt.title(model_name + ' Training loss')
     plt.legend()
     plt.grid(which='both', axis='both')
-    plt.savefig('models/' + model_name + '/train_valid_loss.png')
+    plt.savefig(project_path + 'models/' + model_name + '/train_valid_loss.png')
     plt.close(1)
 
     plt.figure(2)
-    plt.plot(range(len(train_perf['accuracy'])), train_perf['accuracy'], label='Accuracy')
-    plt.plot(range(len(train_perf['precision'])), train_perf['precision'], label='Precision')
-    plt.plot(range(len(train_perf['recall'])), train_perf['recall'], label='Recall')
-    plt.plot(range(len(train_perf['F1score'])), train_perf['F1score'], label='F1 score')
-    plt.title(model_name + ' Training metrics')
+    plt.plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'], label='Train Accuracy')
+    plt.plot(range(len(train_perf['valid_accuracy'])), train_perf['valid_accuracy'], label='Valid Accuracy')
+    plt.title(model_name + ' Training Accuracy')
     plt.legend()
     plt.grid(which='both', axis='both')
-    plt.savefig('models/' + model_name + '/train_perf.png')
+    plt.savefig(project_path + 'models/' + model_name + '/train_perf.png')
     plt.close(2)
+
+    def plot_train_results(model_name, train_perf, project_path):
+        plt.figure(1)
+        plt.plot(range(len(train_perf['train_loss'])), train_perf['train_loss'], label='Train Loss')
+        plt.plot(range(len(train_perf['valid_loss'])), train_perf['valid_loss'], label='Valid Loss')
+        plt.title(model_name + ' Training loss')
+        plt.legend()
+        plt.grid(which='both', axis='both')
+        plt.savefig(project_path + 'models/' + model_name + '/train_valid_loss.png')
+        plt.close(1)
+
+        plt.figure(2)
+        plt.plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'], label='Train Accuracy')
+        plt.plot(range(len(train_perf['valid_accuracy'])), train_perf['valid_accuracy'], label='Valid Accuracy')
+        plt.title(model_name + ' Training Accuracy')
+        plt.legend()
+        plt.grid(which='both', axis='both')
+        plt.savefig(project_path + 'models/' + model_name + '/train_perf.png')
+        plt.close(2)
+
+def plot_all_results(model_name_list, train_perf, project_path):
+    fig, ax = plt.subplots(2, 4, sharex=False, sharey=False)
+    fig.set_figheight(10)
+    fig.set_figwidth(25)
+
+    for model_ind, model_name in enumerate(model_name_list):
+
+        ax[0][model_ind].plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'],
+                              label='Train Accuracy')
+        ax[0][model_ind].plot(range(len(train_perf['valid_accuracy'])), train_perf['valid_accuracy'],
+                              label='Valid Accuracy')
+        ax[0][model_ind].title.set_text(model_name_list[model_ind] + ' Accuracy')
+        ax[0][model_ind].legend()
+        ax[0][model_ind].grid(which='both', axis='both')
+        ax[0][model_ind].set_ylim([0.8, 1])
+
+        ax[1][model_ind].plot(range(len(train_perf['train_loss'])), train_perf['train_loss'], label='Train Loss')
+        ax[1][model_ind].plot(range(len(train_perf['valid_loss'])), train_perf['valid_loss'], label='Valid Loss')
+        ax[1][model_ind].title.set_text(model_name_list[model_ind] + ' Loss')
+        ax[1][model_ind].legend()
+        ax[1][model_ind].grid(which='both', axis='both')
+        ax[1][model_ind].set_ylim([0, 0.5])
+
+    plt.savefig(project_path + 'results.png')
+    plt.show()
