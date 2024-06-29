@@ -1,9 +1,7 @@
 import pathlib
 import os
 import shutil
-
 import numpy as np
-
 from matplotlib import image
 import matplotlib.pyplot as plt
 
@@ -83,6 +81,8 @@ def plot_all_results(model_name_list, train_perf, project_path):
     fig.set_figwidth(25)
 
     for model_ind, model_name in enumerate(model_name_list):
+
+        train_perf = np.load(project_path + 'models/' + model_name + '/train_perf.npy', allow_pickle=True).item()
 
         ax[0][model_ind].plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'],
                               label='Train Accuracy')

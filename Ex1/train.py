@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import time
-
 import metrics
 
 def train_model(project_path, model_name, model, criterion, optimizer, lr_scheduler, train_loader, valid_loader, device, n_epochs, train_stop_criteria, train_stop_patience, save_state_dic, perf_prev=None):

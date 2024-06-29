@@ -10,30 +10,12 @@ if __name__ == '__main__':
     torch.manual_seed(0)
 
     # parameters
-    model_name_list = ['LeNet5']#['LeNet5+Dropout']#['LeNet5_web1','LeNet5_web2']#['LeNet5+Weight_decay']#['LeNet5+batch_norm']#
-    train_en = 1 # 0 - run test on saved net 1 - train network
+    model_name_list = ['LeNet5','LeNet5+Dropout','LeNet5+Weight_decay','LeNet5+batch_norm']#
+    train_en = 0 # 0 - run test on saved net 1 - train network
     continue_training = 0 # 0 - train from scratch 1 - load saved net and continue training
     test_en = 1
-    train_epochs = 10
+    train_epochs = 30
     save_state_dic = 0
-
-    for model_ind, model_name in enumerate(model_name_list):
-        train_perf = np.load(project_path + 'models/' + model_name + '/train_perf.npy', allow_pickle=True).item()
-        plt.figure(2)
-        plt.plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'], label='Train Accuracy')
-        plt.plot(range(len(train_perf['valid_accuracy'])), train_perf['valid_accuracy'], label='Valid Accuracy')
-        plt.title(model_name + ' Training Accuracy')
-        plt.legend()
-        plt.grid(which='both', axis='both')
-        plt.savefig(project_path + 'models/' + model_name + '/train_perf.png')
-        plt.close(2)
-
-    fig, ax = plt.subplots(2, 4, sharex=True, sharey=True)
-    model_name = 'LeNet5'
-    train_perf = np.load(project_path + 'models/' + model_name + '/train_perf.npy', allow_pickle=True).item()
-    ax[0][0].plot(range(len(train_perf['train_accuracy'])), train_perf['train_accuracy'], label='Train Accuracy')
-    plt.show()
-
 
     # initiate data folders and transfers
     train_transforms = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0,), (1,))])
@@ -93,4 +75,3 @@ if __name__ == '__main__':
     print('Best(Accuracy score) Net is: {}'.format(model_name_list[int(best_ind)]))
 
     plot_all_results(model_name_list, train_perf, project_path)
-
