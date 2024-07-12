@@ -29,7 +29,8 @@ torch.manual_seed(1111)
 # Load data
 corpus = corpus.Corpus(args.data)
 
-
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+#device = torch.device('cpu')
 def batchify(data, bsz):
     # Work out how cleanly we can divide the dataset into bsz parts.
     nbatch = data.size(0) // bsz
@@ -94,14 +95,16 @@ def evaluate(data_source):
 
 def train():
     # choose a optimizer
-
+    model.to(device)
     model.train()
     total_loss = 0
     start_time = time.time()
     hidden = model.init_hidden(args.batch_size)
+    [hidden[i].to(device) for i in range(len(hidden))]
     # train_data size(batchcnt, bsz)
     for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
         data, targets = get_batch(train_data, i)
+        data, targets = data.to(device), targets.to(device)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
         hidden = repackage_hidden(hidden)
@@ -125,6 +128,8 @@ def train():
                 elapsed * 1000 / interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
+
+    model.to('cpu')
 
 # Loop over epochs.
 lr = args.lr
