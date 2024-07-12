@@ -3,11 +3,18 @@ import torch.nn as nn
 
 class RNNModel(nn.Module):
 
-    def __init__(self, ntoken, ninp, nhid, nlayers, dropout=0.5):
+    def __init__(self, type, ntoken, ninp, nhid, nlayers, dropout=0.5):
         super(RNNModel, self).__init__()
         self.drop = nn.Dropout(dropout)
         self.encoder = nn.Embedding(ntoken, ninp) # Token2Embeddings
-        self.rnn = nn.LSTM(ninp, nhid, nlayers, dropout=dropout) #(seq_len, batch_size, emb_size)
+        self.type = type
+        if self.type == 'LSTM':
+            self.rnn = nn.LSTM(ninp, nhid, nlayers, dropout=dropout)  # (seq_len, batch_size, emb_size)
+        elif self.type == 'GRU':
+            self.rnn = nn.GRU(ninp, nhid, nlayers, dropout=dropout)  # (seq_len, batch_size, emb_size)
+        else:
+            print('Unsupported RNN type')
+            exit()
         self.decoder = nn.Linear(nhid, ntoken)
         self.init_weights()
         self.nhid = nhid
@@ -34,4 +41,30 @@ class RNNModel(nn.Module):
     def init_hidden(self, bsz):
         # LSTM h and c
         weight = next(self.parameters()).data
-        return weight.new_zeros(self.nlayers, bsz, self.nhid), weight.new_zeros(self.nlayers, bsz, self.nhid)
+        if self.type == 'LSTM':
+            return weight.new_zeros(self.nlayers, bsz, self.nhid), weight.new_zeros(self.nlayers, bsz, self.nhid)
+        elif self.type == 'GRU':
+            return weight.new_zeros(self.nlayers, bsz, self.nhid)
+        else:
+            print('Unsupported RNN type')
+            exit()
+
+    def hidden_to_device(self, hidden, device):
+        if self.type == 'LSTM':
+            hidden = [hidden[i].to(device) for i in range(len(hidden))]
+        elif self.type == 'GRU':
+            hidden = hidden.to(device)
+        else:
+            print('Unsupported RNN type')
+            exit()
+        return hidden
+
+    def repackage_hidden(self, h):
+        # detach
+        if self.type == 'LSTM':
+            return tuple(v.clone().detach() for v in h)
+        elif self.type == 'GRU':
+            return h.clone().detach()
+        else:
+            print('Unsupported RNN type')
+            exit()

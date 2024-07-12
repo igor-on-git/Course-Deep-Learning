@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Lang
 parser.add_argument('--data', type=str, default='./data', # /input
                     help='location of the data corpus')
 parser.add_argument('--checkpoint', type=str, default='')
+parser.add_argument('--type', type=str, default='LSTM')
 parser.add_argument('--emsize', type=int, default=200)
 parser.add_argument('--nhid', type=int, default=200)
 parser.add_argument('--nlayers', type=int, default=2)
@@ -49,7 +50,7 @@ test_data = batchify(corpus.test, eval_batch_size)
 # Build the model
 interval = 100 # interval to report
 ntokens = len(corpus.dictionary) # 10000
-model = model.RNNModel(ntokens, args.emsize, args.nhid, args.nlayers, args.dropout)
+model = model.RNNModel(args.type, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout)
 
 # Load checkpoint
 if args.checkpoint != '':
@@ -59,12 +60,6 @@ print(model)
 criterion = nn.CrossEntropyLoss()
 
 # Training code
-
-def repackage_hidden(h):
-    # detach
-    return tuple(v.clone().detach() for v in h)
-
-
 def get_batch(source, i):
     # source: size(total_len//bsz, bsz)
     seq_len = min(args.bptt, len(source) - 1 - i)
@@ -89,7 +84,7 @@ def evaluate(data_source):
             # inputdata size(bptt, bsz), and size(bptt, bsz, embsize) after embedding
             # output size(bptt*bsz, ntoken)
             total_loss += len(data) * criterion(output, targets).data
-            hidden = repackage_hidden(hidden)
+            hidden = model.repackage_hidden(hidden)
         return total_loss / len(data_source)
 
 
@@ -100,14 +95,14 @@ def train():
     total_loss = 0
     start_time = time.time()
     hidden = model.init_hidden(args.batch_size)
-    [hidden[i].to(device) for i in range(len(hidden))]
+    hidden = model.hidden_to_device(hidden, device)
     # train_data size(batchcnt, bsz)
     for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
         data, targets = get_batch(train_data, i)
         data, targets = data.to(device), targets.to(device)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        hidden = repackage_hidden(hidden)
+        hidden = model.repackage_hidden(hidden)
         output, hidden = model(data, hidden)
         loss = criterion(output, targets)
         opt.zero_grad()
