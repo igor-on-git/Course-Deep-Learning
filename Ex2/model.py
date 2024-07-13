@@ -1,6 +1,4 @@
 import torch.nn as nn
-
-
 class RNNModel(nn.Module):
 
     def __init__(self, type, ntoken, ninp, nhid, nlayers, dropout=0.5):
@@ -68,3 +66,41 @@ class RNNModel(nn.Module):
         else:
             print('Unsupported RNN type')
             exit()
+
+
+def param_selector(type):
+
+    params = {}
+    params['data'] = './data'
+    params['checkpoint'] = ''
+    params['type'] = 'GRU'
+    params['emsize'] = 200
+    params['nhid'] = 200
+    params['nlayers'] = 2
+    params['lr'] = 20
+    params['clip'] = 0.25
+    params['epochs'] = 5
+    params['batch_size'] = 20
+    params['bptt'] = 35
+    params['dropout'] = 0.5
+    params['save'] = './output/model_test.pt'
+    params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
+
+    if type == 'LSTM':
+        params['type'] = 'LSTM'
+        params['dropout'] = 0
+        params['save'] = './output/model_lstm.pt'
+    if type == 'LSTM+Drop':
+        params['type'] = 'LSTM'
+        params['dropout'] = 0.5
+        params['save'] = './output/model_lstm_drop.pt'
+    if type == 'GRU':
+        params['type'] = 'GRU'
+        params['dropout'] = 0
+        params['save'] = './output/model_gru.pt'
+    if type == 'GRU+Drop':
+        params['type'] = 'GRU'
+        params['dropout'] = 0.5
+        params['save'] = './output/model_gru_drop.pt'
+
+    return params

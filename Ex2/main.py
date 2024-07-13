@@ -8,23 +8,9 @@ import torch.nn as nn
 import corpus
 import model
 
-params = {}
-params['data'] = './data'
-params['checkpoint'] = ''
-params['type'] = 'GRU'
-params['emsize'] = 200
-params['nhid'] = 200
-params['nlayers'] = 2
-params['lr'] = 20
-params['clip'] = 0.25
-params['epochs'] = 5
-params['batch_size'] = 20
-params['bptt'] = 35
-params['dropout'] = 0.5
-params['save'] = './output/model_test.pt'
-params['opt'] = 'SGD' #'SGD, Adam, RMSprop, Momentum'
-
 torch.manual_seed(1111)
+
+params = model.param_selector('LSTM')
 
 # Load data
 corpus = corpus.Corpus(params['data'])
