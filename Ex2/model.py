@@ -79,12 +79,14 @@ def param_selector(type):
     params['nlayers'] = 2
     params['lr'] = 20
     params['clip'] = 0.25
-    params['epochs'] = 5
+    params['epochs'] = 20
     params['batch_size'] = 20
     params['bptt'] = 35
     params['dropout'] = 0.5
     params['save'] = './output/model_test.pt'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
+    params['annealing_gamma'] = 2/3
+    params['annealing_step'] = 3
 
     if type == 'LSTM':
         params['type'] = 'LSTM'

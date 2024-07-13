@@ -1,22 +1,22 @@
 # code referenced from https://github.com/hjc18/language_modeling_lstm/blob/master/main.py
 
-import argparse
 import time
 import math
 import torch
 import torch.nn as nn
 import corpus
 import model
+from torch import optim
 
 torch.manual_seed(1111)
 
-params = model.param_selector('LSTM')
+params = model.param_selector('LSTM+Drop')
 
 # Load data
 corpus = corpus.Corpus(params['data'])
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-#device = torch.device('cpu')
+
 def batchify(data, bsz):
     # Work out how cleanly we can divide the dataset into bsz parts.
     nbatch = data.size(0) // bsz
@@ -108,11 +108,12 @@ def train():
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
-                epoch, batch, len(train_data) // params['bptt'], lr,
+                epoch, batch, len(train_data) // params['bptt'], lr_scheduler.get_last_lr()[0],
                 elapsed * 1000 / interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
 
+    lr_scheduler.step()
     model.to('cpu')
 
 # Loop over epochs.
@@ -127,6 +128,8 @@ if params['opt'] == 'Momentum':
 if params['opt'] == 'RMSprop':
     opt = torch.optim.RMSprop(model.parameters(), lr=0.001, alpha=0.9)
     lr = 0.001
+
+lr_scheduler = optim.lr_scheduler.StepLR(opt, step_size=params['annealing_step'], gamma=params['annealing_gamma'])
 
 try:
     for epoch in range(1, params['epochs']+1):
@@ -145,10 +148,7 @@ try:
             best_val_loss = val_loss
         else:
             # Anneal the learning rate if no improvement has been seen in the validation dataset.
-            if params['opt'] == 'SGD' or params['opt'] == 'Momentum':
-                lr /= 4.0
-                for group in opt.param_groups:
-                    group['lr'] = lr
+            lr_scheduler.step()
 
 except KeyboardInterrupt:
     print('-' * 89)
