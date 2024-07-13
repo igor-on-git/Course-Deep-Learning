@@ -1,3 +1,5 @@
+# code referenced from https://github.com/hjc18/language_modeling_lstm/blob/master/main.py
+
 import argparse
 import time
 import math
@@ -6,29 +8,26 @@ import torch.nn as nn
 import corpus
 import model
 
-parser = argparse.ArgumentParser(description='PyTorch PennTreeBank RNN/LSTM Language Model')
-parser.add_argument('--data', type=str, default='./data', # /input
-                    help='location of the data corpus')
-parser.add_argument('--checkpoint', type=str, default='')
-parser.add_argument('--type', type=str, default='LSTM')
-parser.add_argument('--emsize', type=int, default=200)
-parser.add_argument('--nhid', type=int, default=200)
-parser.add_argument('--nlayers', type=int, default=2)
-parser.add_argument('--lr', type=float, default=20)
-parser.add_argument('--clip', type=float, default=0.25)
-parser.add_argument('--epochs', type=int, default=5)
-parser.add_argument('--batch_size', type=int, default=20)
-parser.add_argument('--bptt', type=int, default=35)
-parser.add_argument('--dropout', type=float, default=0.5)
-parser.add_argument('--save', type=str,  default='./output/model_test.pt')
-parser.add_argument('--opt', type=str,  default='SGD',
-                    help='SGD, Adam, RMSprop, Momentum')
-args = parser.parse_args()
+params = {}
+params['data'] = './data'
+params['checkpoint'] = ''
+params['type'] = 'GRU'
+params['emsize'] = 200
+params['nhid'] = 200
+params['nlayers'] = 2
+params['lr'] = 20
+params['clip'] = 0.25
+params['epochs'] = 5
+params['batch_size'] = 20
+params['bptt'] = 35
+params['dropout'] = 0.5
+params['save'] = './output/model_test.pt'
+params['opt'] = 'SGD' #'SGD, Adam, RMSprop, Momentum'
 
 torch.manual_seed(1111)
 
 # Load data
-corpus = corpus.Corpus(args.data)
+corpus = corpus.Corpus(params['data'])
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 #device = torch.device('cpu')
@@ -43,18 +42,18 @@ def batchify(data, bsz):
 
 
 eval_batch_size = 10
-train_data = batchify(corpus.train, args.batch_size) # size(total_len//bsz, bsz)
+train_data = batchify(corpus.train, params['batch_size']) # size(total_len//bsz, bsz)
 val_data = batchify(corpus.valid, eval_batch_size)
 test_data = batchify(corpus.test, eval_batch_size)
 
 # Build the model
 interval = 100 # interval to report
 ntokens = len(corpus.dictionary) # 10000
-model = model.RNNModel(args.type, ntokens, args.emsize, args.nhid, args.nlayers, args.dropout)
+model = model.RNNModel(params['type'], ntokens, params['emsize'], params['nhid'], params['nlayers'], params['dropout'])
 
 # Load checkpoint
-if args.checkpoint != '':
-    model = torch.load(args.checkpoint, map_location=lambda storage, loc: storage)
+if params['checkpoint'] != '':
+    model = torch.load(params['checkpoint'], map_location=lambda storage, loc: storage)
 
 print(model)
 criterion = nn.CrossEntropyLoss()
@@ -62,7 +61,7 @@ criterion = nn.CrossEntropyLoss()
 # Training code
 def get_batch(source, i):
     # source: size(total_len//bsz, bsz)
-    seq_len = min(args.bptt, len(source) - 1 - i)
+    seq_len = min(params['bptt'], len(source) - 1 - i)
     #data = torch.tensor(source[i:i+seq_len]) # size(bptt, bsz)
     data = source[i:i+seq_len].clone().detach()
     target = source[i+1:i+1+seq_len].clone().detach().view(-1)
@@ -72,21 +71,25 @@ def get_batch(source, i):
 
 def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
+    model.to(device)
     with torch.no_grad():
         model.eval()
         total_loss = 0
         ntokens = len(corpus.dictionary)
         hidden = model.init_hidden(eval_batch_size) #hidden size(nlayers, bsz, hdsize)
-        for i in range(0, data_source.size(0) - 1, args.bptt):# iterate over every timestep
+        hidden = model.hidden_to_device(hidden, device)
+        for i in range(0, data_source.size(0) - 1, params['bptt']):# iterate over every timestep
             data, targets = get_batch(data_source, i)
+            data, targets = data.to(device), targets.to(device)
             output, hidden = model(data, hidden)
             # model input and output
             # inputdata size(bptt, bsz), and size(bptt, bsz, embsize) after embedding
             # output size(bptt*bsz, ntoken)
             total_loss += len(data) * criterion(output, targets).data
             hidden = model.repackage_hidden(hidden)
-        return total_loss / len(data_source)
 
+        model.to('cpu')
+        return total_loss / len(data_source)
 
 def train():
     # choose a optimizer
@@ -94,10 +97,10 @@ def train():
     model.train()
     total_loss = 0
     start_time = time.time()
-    hidden = model.init_hidden(args.batch_size)
+    hidden = model.init_hidden(params['batch_size'])
     hidden = model.hidden_to_device(hidden, device)
     # train_data size(batchcnt, bsz)
-    for batch, i in enumerate(range(0, train_data.size(0) - 1, args.bptt)):
+    for batch, i in enumerate(range(0, train_data.size(0) - 1, params['bptt'])):
         data, targets = get_batch(train_data, i)
         data, targets = data.to(device), targets.to(device)
         # Starting each batch, we detach the hidden state from how it was previously produced.
@@ -109,7 +112,7 @@ def train():
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-        torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), params['clip'])
         opt.step()
 
         total_loss += loss.data
@@ -119,7 +122,7 @@ def train():
             elapsed = time.time() - start_time
             print('| epoch {:3d} | {:5d}/{:5d} batches | lr {:02.2f} | ms/batch {:5.2f} | '
                     'loss {:5.2f} | ppl {:8.2f}'.format(
-                epoch, batch, len(train_data) // args.bptt, lr,
+                epoch, batch, len(train_data) // params['bptt'], lr,
                 elapsed * 1000 / interval, cur_loss, math.exp(cur_loss)))
             total_loss = 0
             start_time = time.time()
@@ -127,20 +130,20 @@ def train():
     model.to('cpu')
 
 # Loop over epochs.
-lr = args.lr
+lr = params['lr']
 best_val_loss = None
 opt = torch.optim.SGD(model.parameters(), lr=lr)
-if args.opt == 'Adam':
+if params['opt'] == 'Adam':
     opt = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.99))
     lr = 0.001
-if args.opt == 'Momentum':
+if params['opt'] == 'Momentum':
     opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.8)
-if args.opt == 'RMSprop':
+if params['opt'] == 'RMSprop':
     opt = torch.optim.RMSprop(model.parameters(), lr=0.001, alpha=0.9)
     lr = 0.001
 
 try:
-    for epoch in range(1, args.epochs+1):
+    for epoch in range(1, params['epochs']+1):
         epoch_start_time = time.time()
         train()
         val_loss = evaluate(val_data)
@@ -151,12 +154,12 @@ try:
         print('-' * 89)
         # Save the model if the validation loss is the best we've seen so far.
         if not best_val_loss or val_loss < best_val_loss:
-            with open(args.save, 'wb') as f:
+            with open(params['save'], 'wb') as f:
                 torch.save(model, f)
             best_val_loss = val_loss
         else:
             # Anneal the learning rate if no improvement has been seen in the validation dataset.
-            if args.opt == 'SGD' or args.opt == 'Momentum':
+            if params['opt'] == 'SGD' or params['opt'] == 'Momentum':
                 lr /= 4.0
                 for group in opt.param_groups:
                     group['lr'] = lr
@@ -166,7 +169,7 @@ except KeyboardInterrupt:
     print('Exiting from training early')
 
 # Load the best saved model.
-with open(args.save, 'rb') as f:
+with open(params['save'], 'rb') as f:
     model = torch.load(f)
 
 # Run on test data.
