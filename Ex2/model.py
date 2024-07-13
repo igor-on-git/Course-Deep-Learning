@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 class RNNModel(nn.Module):
 
     def __init__(self, type, ntoken, ninp, nhid, nlayers, dropout=0.5):
@@ -72,6 +73,8 @@ def param_selector(type):
 
     params = {}
     params['data'] = './data'
+    params['train_model'] = 1
+    params['continue_training'] = 1
     params['checkpoint'] = ''
     params['type'] = 'GRU'
     params['emsize'] = 200
@@ -79,11 +82,11 @@ def param_selector(type):
     params['nlayers'] = 2
     params['lr'] = 20
     params['clip'] = 0.25
-    params['epochs'] = 20
+    params['epochs'] = 10
     params['batch_size'] = 20
     params['bptt'] = 35
     params['dropout'] = 0.5
-    params['save'] = './output/model_test.pt'
+    params['save'] = './output/model_test'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
     params['annealing_gamma'] = 2/3
     params['annealing_step'] = 3
@@ -91,18 +94,36 @@ def param_selector(type):
     if type == 'LSTM':
         params['type'] = 'LSTM'
         params['dropout'] = 0
-        params['save'] = './output/model_lstm.pt'
+        params['save'] = './output/model_lstm'
     if type == 'LSTM+Drop':
         params['type'] = 'LSTM'
         params['dropout'] = 0.5
-        params['save'] = './output/model_lstm_drop.pt'
+        params['save'] = './output/model_lstm_drop'
     if type == 'GRU':
         params['type'] = 'GRU'
         params['dropout'] = 0
-        params['save'] = './output/model_gru.pt'
+        params['save'] = './output/model_gru'
     if type == 'GRU+Drop':
         params['type'] = 'GRU'
         params['dropout'] = 0.5
-        params['save'] = './output/model_gru_drop.pt'
+        params['save'] = './output/model_gru_drop'
 
     return params
+
+def load_model(file_path):
+
+    with open(file_path, 'rb') as f:
+        return torch.load(f)
+
+def init_train_perf():
+
+    train_perf = {}
+    train_perf['train_loss'] = []
+    train_perf['valid_loss'] = []
+    train_perf['test_loss'] = []
+    train_perf['train_ppl'] = []
+    train_perf['valid_ppl'] = []
+    train_perf['test_ppl'] = []
+    train_perf['lr'] = 0
+
+    return train_perf

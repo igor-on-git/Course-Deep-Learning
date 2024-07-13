@@ -5,12 +5,13 @@ import math
 import torch
 import torch.nn as nn
 import corpus
-import model
+from model import *
 from torch import optim
+import numpy as np
 
 torch.manual_seed(1111)
 
-params = model.param_selector('LSTM+Drop')
+params = param_selector('LSTM+Drop')
 
 # Load data
 corpus = corpus.Corpus(params['data'])
@@ -35,13 +36,25 @@ test_data = batchify(corpus.test, eval_batch_size)
 # Build the model
 interval = 100 # interval to report
 ntokens = len(corpus.dictionary) # 10000
-model = model.RNNModel(params['type'], ntokens, params['emsize'], params['nhid'], params['nlayers'], params['dropout'])
+
+rnn_model = []
+if params['continue_training']:
+    try:
+        rnn_model = load_model(params['save']+'.pt')
+        train_perf = np.load(params['save'] + '_train_perf.npy', allow_pickle=True).item()
+        params['lr'] = train_perf['lr']
+    except:
+        print('saved model not found')
+
+if rnn_model == []:
+    rnn_model = RNNModel(params['type'], ntokens, params['emsize'], params['nhid'], params['nlayers'], params['dropout'])
+    train_perf = init_train_perf()
 
 # Load checkpoint
 if params['checkpoint'] != '':
-    model = torch.load(params['checkpoint'], map_location=lambda storage, loc: storage)
+    rnn_model = torch.load(params['checkpoint'], map_location=lambda storage, loc: storage)
 
-print(model)
+print(rnn_model)
 criterion = nn.CrossEntropyLoss()
 
 # Training code
@@ -57,48 +70,48 @@ def get_batch(source, i):
 
 def evaluate(data_source):
     # Turn on evaluation mode which disables dropout.
-    model.to(device)
+    rnn_model.to(device)
     with torch.no_grad():
-        model.eval()
+        rnn_model.eval()
         total_loss = 0
         ntokens = len(corpus.dictionary)
-        hidden = model.init_hidden(eval_batch_size) #hidden size(nlayers, bsz, hdsize)
-        hidden = model.hidden_to_device(hidden, device)
+        hidden = rnn_model.init_hidden(eval_batch_size) #hidden size(nlayers, bsz, hdsize)
+        hidden = rnn_model.hidden_to_device(hidden, device)
         for i in range(0, data_source.size(0) - 1, params['bptt']):# iterate over every timestep
             data, targets = get_batch(data_source, i)
             data, targets = data.to(device), targets.to(device)
-            output, hidden = model(data, hidden)
+            output, hidden = rnn_model(data, hidden)
             # model input and output
             # inputdata size(bptt, bsz), and size(bptt, bsz, embsize) after embedding
             # output size(bptt*bsz, ntoken)
             total_loss += len(data) * criterion(output, targets).data
-            hidden = model.repackage_hidden(hidden)
+            hidden = rnn_model.repackage_hidden(hidden)
 
-        model.to('cpu')
+        rnn_model.to('cpu')
         return total_loss / len(data_source)
 
 def train():
     # choose a optimizer
-    model.to(device)
-    model.train()
+    rnn_model.to(device)
+    rnn_model.train()
     total_loss = 0
     start_time = time.time()
-    hidden = model.init_hidden(params['batch_size'])
-    hidden = model.hidden_to_device(hidden, device)
+    hidden = rnn_model.init_hidden(params['batch_size'])
+    hidden = rnn_model.hidden_to_device(hidden, device)
     # train_data size(batchcnt, bsz)
     for batch, i in enumerate(range(0, train_data.size(0) - 1, params['bptt'])):
         data, targets = get_batch(train_data, i)
         data, targets = data.to(device), targets.to(device)
         # Starting each batch, we detach the hidden state from how it was previously produced.
         # If we didn't, the model would try backpropagating all the way to start of the dataset.
-        hidden = model.repackage_hidden(hidden)
-        output, hidden = model(data, hidden)
+        hidden = rnn_model.repackage_hidden(hidden)
+        output, hidden = rnn_model(data, hidden)
         loss = criterion(output, targets)
         opt.zero_grad()
         loss.backward()
 
         # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
-        torch.nn.utils.clip_grad_norm_(model.parameters(), params['clip'])
+        torch.nn.utils.clip_grad_norm_(rnn_model.parameters(), params['clip'])
         opt.step()
 
         total_loss += loss.data
@@ -113,53 +126,62 @@ def train():
             total_loss = 0
             start_time = time.time()
 
+    train_perf['train_loss'].extend([cur_loss])
+    train_perf['train_ppl'].extend([math.exp(cur_loss)])
+    train_perf['lr'] = lr_scheduler.get_last_lr()[0]
     lr_scheduler.step()
-    model.to('cpu')
+    rnn_model.to('cpu')
 
 # Loop over epochs.
 lr = params['lr']
 best_val_loss = None
-opt = torch.optim.SGD(model.parameters(), lr=lr)
+opt = torch.optim.SGD(rnn_model.parameters(), lr=lr)
 if params['opt'] == 'Adam':
-    opt = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.99))
+    opt = torch.optim.Adam(rnn_model.parameters(), lr=0.001, betas=(0.9, 0.99))
     lr = 0.001
 if params['opt'] == 'Momentum':
-    opt = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.8)
+    opt = torch.optim.SGD(rnn_model.parameters(), lr=lr, momentum=0.8)
 if params['opt'] == 'RMSprop':
-    opt = torch.optim.RMSprop(model.parameters(), lr=0.001, alpha=0.9)
+    opt = torch.optim.RMSprop(rnn_model.parameters(), lr=0.001, alpha=0.9)
     lr = 0.001
 
 lr_scheduler = optim.lr_scheduler.StepLR(opt, step_size=params['annealing_step'], gamma=params['annealing_gamma'])
 
-try:
-    for epoch in range(1, params['epochs']+1):
-        epoch_start_time = time.time()
-        train()
-        val_loss = evaluate(val_data)
-        print('-' * 89)
-        print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
-                'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
-                                           val_loss, math.exp(val_loss)))
-        print('-' * 89)
-        # Save the model if the validation loss is the best we've seen so far.
-        if not best_val_loss or val_loss < best_val_loss:
-            with open(params['save'], 'wb') as f:
-                torch.save(model, f)
-            best_val_loss = val_loss
-        else:
-            # Anneal the learning rate if no improvement has been seen in the validation dataset.
-            lr_scheduler.step()
+if params['train_model']:
+    try:
+        for epoch in range(1, params['epochs']+1):
+            epoch_start_time = time.time()
+            train()
+            val_loss = evaluate(val_data)
+            train_perf['valid_loss'].extend([val_loss])
+            train_perf['valid_ppl'].extend([math.exp(val_loss)])
+            print('-' * 89)
+            print('| end of epoch {:3d} | time: {:5.2f}s | valid loss {:5.2f} | '
+                    'valid ppl {:8.2f}'.format(epoch, (time.time() - epoch_start_time),
+                                               val_loss, math.exp(val_loss)))
+            print('-' * 89)
+            # Save the model if the validation loss is the best we've seen so far.
+            if not best_val_loss or val_loss < best_val_loss:
+                with open(params['save']+'.pt', 'wb') as f:
+                    torch.save(rnn_model, f)
+                    np.save(params['save'] + '_train_perf.npy', train_perf)
+                best_val_loss = val_loss
+            else:
+                # Anneal the learning rate if no improvement has been seen in the validation dataset.
+                lr_scheduler.step()
 
-except KeyboardInterrupt:
-    print('-' * 89)
-    print('Exiting from training early')
+    except KeyboardInterrupt:
+        print('-' * 89)
+        print('Exiting from training early')
 
 # Load the best saved model.
-with open(params['save'], 'rb') as f:
-    model = torch.load(f)
+rnn_model = load_model(params['save']+'.pt')
 
 # Run on test data.
 test_loss = evaluate(test_data)
+train_perf['test_loss'] = test_loss
+train_perf['test_ppl'] = math.exp(test_loss)
+np.save(params['save'] + '_train_perf.npy', train_perf)
 print('=' * 89)
 print('| End of training | test loss {:5.2f} | test ppl {:8.2f}'.format(
     test_loss, math.exp(test_loss)))
