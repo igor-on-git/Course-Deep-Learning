@@ -1,5 +1,8 @@
 import torch.nn as nn
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
+
 class RNNModel(nn.Module):
 
     def __init__(self, type, ntoken, ninp, nhid, nlayers, dropout=0.5):
@@ -72,15 +75,14 @@ class RNNModel(nn.Module):
 def param_selector(type):
 
     params = {}
+    params['name'] = 'LSTM'
     params['data'] = './data'
     params['train_model'] = 1
-    params['continue_training'] = 1
-    params['checkpoint'] = ''
+    params['continue_training'] = 0
     params['type'] = 'GRU'
     params['emsize'] = 200
     params['nhid'] = 200
     params['nlayers'] = 2
-    params['lr'] = 20
     params['clip'] = 0.25
     params['epochs'] = 10
     params['batch_size'] = 20
@@ -88,24 +90,37 @@ def param_selector(type):
     params['dropout'] = 0.5
     params['save'] = './output/model_test'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
+    params['lr'] = 20
     params['annealing_gamma'] = 2/3
-    params['annealing_step'] = 3
+    params['annealing_step'] = 1
 
     if type == 'LSTM':
+        params['name'] = 'LSTM'
         params['type'] = 'LSTM'
+        params['epochs'] = 15
+        params['lr'] = 20
         params['dropout'] = 0
         params['save'] = './output/model_lstm'
     if type == 'LSTM+Drop':
+        params['name'] = 'LSTM+Drop'
         params['type'] = 'LSTM'
-        params['dropout'] = 0.5
+        params['epochs'] = 20
+        params['lr'] = 10
+        params['dropout'] = 0.45
         params['save'] = './output/model_lstm_drop'
     if type == 'GRU':
+        params['name'] = 'GRU'
         params['type'] = 'GRU'
+        params['epochs'] = 15
+        params['lr'] = 10
         params['dropout'] = 0
         params['save'] = './output/model_gru'
     if type == 'GRU+Drop':
+        params['name'] = 'GRU+Drop'
         params['type'] = 'GRU'
-        params['dropout'] = 0.5
+        params['epochs'] = 20
+        params['lr'] = 15
+        params['dropout'] = 0.45
         params['save'] = './output/model_gru_drop'
 
     return params
@@ -127,3 +142,39 @@ def init_train_perf():
     train_perf['lr'] = 0
 
     return train_perf
+
+def plot_all_results(name_list):
+
+    fig, ax = plt.subplots(2, 2, sharex=False, sharey=False)
+    fig.set_figheight(10)
+    fig.set_figwidth(25)
+
+    for model_ind, name in enumerate(name_list):
+
+        params = param_selector(name)
+        train_perf = np.load(params['save'] + '_train_perf.npy', allow_pickle=True).item()
+
+        ax[model_ind//2][model_ind % 2].plot(range(len(train_perf['train_ppl'])), train_perf['train_ppl'],
+                              label='Train Perplexity')
+        ax[model_ind//2][model_ind % 2].plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'],
+                              label='Valid Perplexity')
+        #ax[model_ind//2][model_ind % 2].title.set_text(params['name'] + ' - LR ' + str(train_perf['lr'],'.2f'))
+        ax[model_ind // 2][model_ind % 2].title.set_text('{} - LR {:02.2f}'.format(params['name'],train_perf['lr']))
+        ax[model_ind//2][model_ind % 2].legend()
+        ax[model_ind//2][model_ind % 2].grid(which='both', axis='both')
+        ax[model_ind//2][model_ind % 2].set_ylim([0, 350])
+
+    plt.savefig('./output/' + 'results.png')
+    plt.show()
+
+def plot_results(params, train_perf):
+
+    plt.figure()
+    train_perf = np.load(params['save'] + '_train_perf.npy', allow_pickle=True).item()
+    plt.plot(range(len(train_perf['train_ppl'])), train_perf['train_ppl'], label='Train Perplexity')
+    plt.plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'], label='Valid Perplexity')
+    plt.title('{} - LR {:02.2f}'.format(params['name'], train_perf['lr']))
+    plt.legend()
+    plt.grid(which='both', axis='both')
+    plt.savefig(params['save'] + '_results.png')
+    plt.show()

@@ -47,3 +47,21 @@ class Corpus(object):
                     token += 1
 
         return ids
+
+def batchify(data, bsz):
+    # Work out how cleanly we can divide the dataset into bsz parts.
+    nbatch = data.size(0) // bsz
+    # Trim off any extra elements that wouldn't cleanly fit (remainders).
+    data = data.narrow(0, 0, nbatch * bsz)
+    # Evenly divide the data across the bsz batches.
+    data = data.view(bsz, -1).t().contiguous()
+    return data
+
+def get_batch(source, bptt, i):
+    # source: size(total_len//bsz, bsz)
+    seq_len = min(bptt, len(source) - 1 - i)
+    #data = torch.tensor(source[i:i+seq_len]) # size(bptt, bsz)
+    data = source[i:i+seq_len].clone().detach()
+    target = source[i+1:i+1+seq_len].clone().detach().view(-1)
+    #target = torch.tensor(source[i+1:i+1+seq_len].view(-1)) # size(bptt * bsz)
+    return data, target
