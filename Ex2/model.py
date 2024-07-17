@@ -3,12 +3,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 class RNNModel(nn.Module):
 
     def __init__(self, type, ntoken, ninp, nhid, nlayers, dropout=0.5):
         super(RNNModel, self).__init__()
         self.drop = nn.Dropout(dropout)
-        self.encoder = nn.Embedding(ntoken, ninp) # Token2Embeddings
+        self.encoder = nn.Embedding(ntoken, ninp)  # Token2Embeddings
         self.type = type
         if self.type == 'LSTM':
             self.rnn = nn.LSTM(ninp, nhid, nlayers, dropout=dropout)  # (seq_len, batch_size, emb_size)
@@ -23,7 +24,7 @@ class RNNModel(nn.Module):
         self.nlayers = nlayers
 
     def init_weights(self):
-        initrange = 0.05*2
+        initrange = 0.05 * 2
         self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.fill_(0)
         self.decoder.weight.data.uniform_(-initrange, initrange)
@@ -37,7 +38,7 @@ class RNNModel(nn.Module):
         # output size(bptt, bsz, nhid)
         output = self.drop(output)
         # decoder: nhid -> ntoken
-        decoded = self.decoder(output.view(output.size(0)*output.size(1), output.size(2)))
+        decoded = self.decoder(output.view(output.size(0) * output.size(1), output.size(2)))
         return decoded, hidden
 
     def init_hidden(self, bsz):
@@ -73,7 +74,6 @@ class RNNModel(nn.Module):
 
 
 def param_selector(type):
-
     params = {}
     params['name'] = 'LSTM'
     params['data'] = './data'
@@ -86,12 +86,11 @@ def param_selector(type):
     params['clip'] = 0.25
     params['epochs'] = 10
     params['batch_size'] = 20
-    params['bptt'] = 20#35
+    params['bptt'] = 20  #35
     params['dropout'] = 0.5
     params['save'] = './output/model_test'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
     params['lr'] = 20
-
 
     if type == 'LSTM':
         params['name'] = 'LSTM'
@@ -137,13 +136,13 @@ def param_selector(type):
 
     return params
 
-def load_model(file_path):
 
+def load_model(file_path):
     with open(file_path, 'rb') as f:
         return torch.load(f)
 
-def init_train_perf():
 
+def init_train_perf():
     train_perf = {}
     train_perf['train_loss'] = []
     train_perf['valid_loss'] = []
@@ -155,34 +154,43 @@ def init_train_perf():
 
     return train_perf
 
-def plot_all_results(name_list):
 
+def plot_all_results(name_list):
     fig, ax = plt.subplots(2, 2, sharex=False, sharey=False)
     fig.set_figheight(10)
     fig.set_figwidth(25)
 
     for model_ind, name in enumerate(name_list):
-
         params = param_selector(name)
         train_perf = np.load(params['save'] + '_train_perf.npy', allow_pickle=True).item()
 
-        ax[model_ind//2][model_ind % 2].plot(range(len(train_perf['train_ppl'])), train_perf['train_ppl'],
-                              label='Train Perplexity')
-        ax[model_ind//2][model_ind % 2].plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'],
-                              label='Valid Perplexity')
+        print(
+            '| model: {:10}| train loss {:5.2f} | train ppl {:8.2f} | valid loss {:5.2f} | valid ppl {:8.2f} |  test loss {:5.2f} | test ppl {:8.2f} |'
+            .format(name, train_perf['train_loss'][-1], train_perf['train_ppl'][-1], train_perf['valid_loss'][-1],
+                    train_perf['valid_ppl'][-1], train_perf['test_loss'], train_perf['test_ppl']))
+
+        ax[model_ind // 2][model_ind % 2].plot(range(len(train_perf['train_ppl'])), train_perf['train_ppl'],
+                                               label='Train Perplexity')
+        ax[model_ind // 2][model_ind % 2].plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'],
+                                               label='Valid Perplexity')
         #ax[model_ind//2][model_ind % 2].title.set_text(params['name'] + ' - LR ' + str(train_perf['lr'],'.2f'))
-        ax[model_ind // 2][model_ind % 2].title.set_text('{} - LR {:02.2f}'.format(params['name'],train_perf['lr']))
-        ax[model_ind//2][model_ind % 2].legend()
-        ax[model_ind//2][model_ind % 2].grid(which='both', axis='both')
-        ax[model_ind//2][model_ind % 2].set_ylim([0, 350])
+        ax[model_ind // 2][model_ind % 2].title.set_text('{} - LR {:02.2f}'.format(params['name'], train_perf['lr']))
+        ax[model_ind // 2][model_ind % 2].legend()
+        ax[model_ind // 2][model_ind % 2].grid(which='both', axis='both')
+        ax[model_ind // 2][model_ind % 2].set_ylim([0, 350])
 
     plt.savefig('./output/' + 'results.png')
     plt.show()
 
-def plot_results(params, train_perf):
 
+def plot_results(params, train_perf):
     plt.figure()
     train_perf = np.load(params['save'] + '_train_perf.npy', allow_pickle=True).item()
+
+    print(
+        '| train loss {:5.2f} | train ppl {:8.2f} | valid loss {:5.2f} | valid ppl {:8.2f} |  test loss {:5.2f} | test ppl {:8.2f} |'
+        .format(train_perf['train_loss'][-1], train_perf['train_ppl'][-1], train_perf['valid_loss'][-1],
+                train_perf['valid_ppl'][-1], train_perf['test_loss'], train_perf['test_ppl']))
     plt.plot(range(len(train_perf['train_ppl'])), train_perf['train_ppl'], label='Train Perplexity')
     plt.plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'], label='Valid Perplexity')
     plt.title('{} - LR {:02.2f}'.format(params['name'], train_perf['lr']))
