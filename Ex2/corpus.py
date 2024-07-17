@@ -1,52 +1,43 @@
 import os
 import torch
+import numpy as np
 
 class Dictionary(object):
     def __init__(self):
         self.word2idx = {} # word: index
         self.idx2word = [] # position(index): word
 
-    def add_word(self, word):
-        if word not in self.word2idx:
-            self.idx2word.append(word)
-            self.word2idx[word] = len(self.idx2word) - 1
-        return self.word2idx[word]
-
     def __len__(self):
         return len(self.idx2word)
 
+    def translate_word2idx(self, inp):
+        return torch.tensor([self.word2idx[c] for c in inp])
+
+    def translate_idx2word(self, inp):
+        return [self.idx2word[c] for c in inp.numpy()]
 
 class Corpus(object):
     def __init__(self, path):
         self.dictionary = Dictionary()
+
         # three tensors of word index
-        self.train = self.tokenize(os.path.join(path, 'ptb.train.txt'))
-        self.valid = self.tokenize(os.path.join(path, 'ptb.valid.txt'))
-        self.test = self.tokenize(os.path.join(path, 'ptb.test.txt'))
+        with open("./data/ptb.train.txt") as f:
+            file = f.read()
+            trn = file[1:].split(' ')
+        with open("./data/ptb.valid.txt") as f:
+            file = f.read()
+            vld = file[1:].split(' ')
+        with open("./data/ptb.test.txt") as f:
+            file = f.read()
+            tst = file[1:].split(' ')
 
-    def tokenize(self, path):
-        assert os.path.exists(path)
-        # Add words to the dictionary
-        with open(path, 'r') as f:
-            tokens = 0
-            for line in f:
-                # line to list of token + eos
-                words = line.split() + ['<eos>']
-                tokens += len(words)
-                for word in words:
-                    self.dictionary.add_word(word)
+        words = sorted(set(trn))
+        self.dictionary.word2idx = {c: i for i, c in enumerate(words)}
+        self.dictionary.idx2word = {i: c for i, c in enumerate(words)}
 
-        # Tokenize file content
-        with open(path, 'r') as f:
-            ids = torch.LongTensor(tokens)
-            token = 0
-            for line in f:
-                words = line.split() + ['<eos>']
-                for word in words:
-                    ids[token] = self.dictionary.word2idx[word]
-                    token += 1
-
-        return ids
+        self.train = self.dictionary.translate_word2idx(trn)
+        self.valid = self.dictionary.translate_word2idx(vld)
+        self.test  = self.dictionary.translate_word2idx(tst)
 
 def batchify(data, bsz):
     # Work out how cleanly we can divide the dataset into bsz parts.

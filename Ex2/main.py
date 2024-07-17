@@ -12,13 +12,13 @@ import numpy as np
 torch.manual_seed(1111)
 
 name_list = ['LSTM', 'LSTM+Drop', 'GRU', 'GRU+Drop']
-
+name_list = ['LSTM']
 # plot all results
-plot_all_results(name_list)
+#plot_all_results(name_list)
 
 for name in name_list:
     params = param_selector(name)
-    params['train_model'] = 0
+    params['train_model'] = 1
 
     # Load data
     corpus = Corpus(params['data'])
