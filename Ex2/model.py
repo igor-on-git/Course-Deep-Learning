@@ -23,7 +23,7 @@ class RNNModel(nn.Module):
         self.nlayers = nlayers
 
     def init_weights(self):
-        initrange = 0.05
+        initrange = 0.05*2
         self.encoder.weight.data.uniform_(-initrange, initrange)
         self.decoder.bias.data.fill_(0)
         self.decoder.weight.data.uniform_(-initrange, initrange)
@@ -86,41 +86,53 @@ def param_selector(type):
     params['clip'] = 0.25
     params['epochs'] = 10
     params['batch_size'] = 20
-    params['bptt'] = 35
+    params['bptt'] = 20#35
     params['dropout'] = 0.5
     params['save'] = './output/model_test'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
     params['lr'] = 20
-    params['annealing_gamma'] = 2/3
-    params['annealing_step'] = 1
+
 
     if type == 'LSTM':
         params['name'] = 'LSTM'
         params['type'] = 'LSTM'
-        params['epochs'] = 15
-        params['lr'] = 20
         params['dropout'] = 0
+        params['epochs'] = 10
+        params['lr'] = 10
+        params['annealing_gamma'] = 2 / 3
+        params['annealing_step'] = 1
+        params['annealing_start'] = 4
         params['save'] = './output/model_lstm'
     if type == 'LSTM+Drop':
         params['name'] = 'LSTM+Drop'
         params['type'] = 'LSTM'
+        params['dropout'] = 0.3
         params['epochs'] = 20
-        params['lr'] = 10
-        params['dropout'] = 0.45
+        params['lr'] = 20
+        params['annealing_gamma'] = 15 / 20
+        params['annealing_step'] = 1
+        params['annealing_start'] = 9
         params['save'] = './output/model_lstm_drop'
     if type == 'GRU':
         params['name'] = 'GRU'
         params['type'] = 'GRU'
-        params['epochs'] = 15
-        params['lr'] = 10
         params['dropout'] = 0
+        params['epochs'] = 10
+        params['lr'] = 5
+        params['annealing_gamma'] = 2 / 3
+        params['annealing_step'] = 1
+        params['annealing_start'] = 4
         params['save'] = './output/model_gru'
     if type == 'GRU+Drop':
         params['name'] = 'GRU+Drop'
         params['type'] = 'GRU'
-        params['epochs'] = 20
-        params['lr'] = 15
-        params['dropout'] = 0.45
+        params['dropout'] = 0.325
+        params['epochs'] = 35
+        params['lr'] = 13
+        params['annealing_gamma'] = 7 / 8
+        params['annealing_step'] = 1
+        params['annealing_start'] = 8
+
         params['save'] = './output/model_gru_drop'
 
     return params
@@ -175,6 +187,8 @@ def plot_results(params, train_perf):
     plt.plot(range(len(train_perf['valid_ppl'])), train_perf['valid_ppl'], label='Valid Perplexity')
     plt.title('{} - LR {:02.2f}'.format(params['name'], train_perf['lr']))
     plt.legend()
+    plt.xticks(minor=True)
+    plt.yticks(minor=True)
     plt.grid(which='both', axis='both')
     plt.savefig(params['save'] + '_results.png')
     plt.show()
