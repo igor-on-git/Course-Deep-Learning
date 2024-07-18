@@ -1,7 +1,4 @@
-import torch.nn as nn
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
+from import_libs import *
 
 
 class RNNModel(nn.Module):
@@ -86,7 +83,7 @@ def param_selector(type):
     params['clip'] = 0.25
     params['epochs'] = 10
     params['batch_size'] = 20
-    params['bptt'] = 20  #35
+    params['seq_en'] = 20  #35
     params['dropout'] = 0.5
     params['save'] = './output/model_test'
     params['opt'] = 'SGD'  # 'SGD, Adam, RMSprop, Momentum'
